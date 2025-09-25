@@ -4,7 +4,7 @@ Adaptions and infrastructure to facilitate self-hosting of the habit-building pr
 
 ![Screenshot of the Habitica Web Client](website/client/public/static/presskit/Samples/Website/Market.png)
 
-For each release in the Habitica upstream repository, the self-hosting adaptions are automatically applied by rebasing the `self-host` branch onto the last release commit. The Docker images for server and client are built then and pushed to Docker Hub as [awinterstein/habitica-server](https://hub.docker.com/r/awinterstein/habitica-server) and [awinterstein/habitica-client](https://hub.docker.com/r/awinterstein/habitica-client).
+For each release in the Habitica upstream repository, the self-hosting adaptions are automatically applied by rebasing the `self-host` branch onto the last release commit. The Docker images for server and client are built then and pushed to Docker Hub as [sudoxreboot/habitica-self-host](https://hub.docker.com/r/sudoxreboot/habitica-self-host) and [awinterstein/habitica-client](https://hub.docker.com/r/awinterstein/habitica-client).
 
 ## Improvements for Self-Hosting
 
@@ -19,6 +19,7 @@ The following noteworthy changes were applied to the Habitica source code:
 - settings and links (e.g., in the footer) that do not make sense for a self-hosted site were removed
 - registrations can be restricted to only invited users via a configuration parameter
 - analytics and payment scripts are not loaded
+- unified push notifications can be delivered through a configurable UnifiedPush distributor (using [`PUSH_CONFIGS_UNIFIEDPUSH_URL`](#unifiedpush-configuration))
 
 ## Limitations
 
@@ -51,36 +52,37 @@ The server port could directly be exposed as port 80 on the host. However, usual
 The following Docker Compose file can be used for setting up the containers:
 
 ```yaml
-version: "3"
 services:
   server:
-    image: docker.io/awinterstein/habitica-server:latest
+    image: docker.io/sudoxreboot/habitica-self-host:latest
     restart: unless-stopped
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     environment:
-      - NODE_DB_URI=mongodb://mongo/habitica # this only needs to be adapted if using a separate database
-      - BASE_URL=http://127.0.0.1:3000 # change this to the URL under which your instance will be reachable
+      - NODE_DB_URI=mongodb://mongo/habitica?replicaSet=rs # adjust if you run an external Mongo database
+      - BASE_URL=https://habitica.example.com # change this to the URL under which your instance will be reachable
       - INVITE_ONLY=false # change to `true` after registration of initial users, to restrict further registrations
       - EMAIL_SERVER_URL=mail.example.com
       - EMAIL_SERVER_PORT=587
       - EMAIL_SERVER_AUTH_USER=mail_user
       - EMAIL_SERVER_AUTH_PASSWORD=mail_password
       - ADMIN_EMAIL=mail@example.com # the sender address to send out emails
+      - PUSH_CONFIGS_UNIFIEDPUSH_URL=https://unifiedpush.example.com/ # optional base URL for UnifiedPush devices
+      - PUSH_CONFIGS_UNIFIEDPUSH_AUTHORIZATION=Bearer example-token # optional auth header for UnifiedPush
     ports:
       - "3000:3000"
     networks:
       - habitica
   mongo:
-    image: docker.io/mongo:latest # better to replace 'latest' with the concrete mongo version (e.g., the most recent one)
+    image: docker.io/mongo:5.0.23 # pin to a known-good MongoDB version for replica set support
     restart: unless-stopped
     hostname: mongo
     command: ["--replSet", "rs", "--bind_ip_all", "--port", "27017"]
     healthcheck:
-      test: echo "try { rs.status() } catch (err) { rs.initiate() }" | mongosh --port 27017 --quiet
+      test: ["CMD-SHELL", "echo \"try { rs.status() } catch (err) { rs.initiate({_id: 'rs', members: [{ _id: 0, host: 'mongo:27017' }]}) }\" | mongosh --quiet --port 27017"]
       interval: 10s
       timeout: 30s
-      start_period: 0s
       start_interval: 1s
       retries: 30
     volumes:
@@ -94,6 +96,10 @@ networks:
   habitica:
     driver: bridge
 ```
+
+### UnifiedPush configuration
+
+Habitica Self-Host can now deliver UnifiedPush notifications. Devices that register with `type: "unifiedpush"` will post to their configured endpoints. If your mobile app supplies a relative registration ID, set `PUSH_CONFIGS_UNIFIEDPUSH_URL` to the base URL of your UnifiedPush distributor so the server can resolve the full endpoint URL. Use `PUSH_CONFIGS_UNIFIEDPUSH_AUTHORIZATION` when the distributor requires an Authorization header (for example, `Bearer <token>`). The `/api/v3/user/push-devices/test` endpoint now sends a default "Test Successful" notification so you can verify configuration quickly.
 
 > [!IMPORTANT]
 > If you are planning to run the Habitica containers on a Raspberry Pi 4, you might not be able to use `mongo:latest` (see [issue 20](https://github.com/awinterstein/habitica/issues/20)). In this case you can try to use `mongo:bionic` instead.
