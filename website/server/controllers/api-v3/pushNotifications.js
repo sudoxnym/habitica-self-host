@@ -87,11 +87,10 @@ api.sendUnifiedPushTest = {
       throw new NotFound(res.t('pushDeviceNotFound'));
     }
 
-    const notificationTitle = req.body?.title
-      || res.t('unifiedPushTestTitle', { defaultValue: 'Habitica UnifiedPush Test' });
-    const notificationMessage = req.body?.message
-      || res.t('unifiedPushTestMessage', { defaultValue: 'This is a test UnifiedPush notification from Habitica.' });
-    const successMessage = res.t('unifiedPushTestSent', { defaultValue: 'UnifiedPush test notification sent.' });
+    // Use simple built-in defaults to avoid missing translation strings.
+    const notificationTitle = req.body?.title || 'Test Successful';
+    const notificationMessage = req.body?.message || 'This is a test UnifiedPush notification from Habitica.';
+    const successMessage = 'UnifiedPush test notification sent.';
 
     const userForPush = user.toObject ? user.toObject() : { ...user };
     userForPush._id = user._id;

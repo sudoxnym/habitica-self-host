@@ -1,16 +1,19 @@
-version: "3"
 services:
   server:
     build:
       context: .
       dockerfile: ./Dockerfile
       target: server
+    restart: unless-stopped
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     environment:
-      - NODE_DB_URI=mongodb://mongo/habitica?replicaSet=rs # this only needs to be adapted if using a separate database
-      - BASE_URL=http://127.0.0.1:8080 # change this to the URL under which your instance will be reachable
+      - NODE_DB_URI=mongodb://mongo/habitica?replicaSet=rs # adjust if you run an external Mongo database
+      - BASE_URL=http://127.0.0.1:3000 # change this to the URL under which your instance will be reachable
       - INVITE_ONLY=false # change to `true` after registration of initial users, to restrict further registrations
+      - PUSH_CONFIGS_UNIFIEDPUSH_URL=${UP_BASE_URL:-} # optional: base URL for UnifiedPush distributor
+      - PUSH_CONFIGS_UNIFIEDPUSH_AUTHORIZATION=${UP_AUTH_HEADER:-} # optional: Authorization header for UnifiedPush
     networks:
       - habitica
     ports:
@@ -21,7 +24,7 @@ services:
     hostname: mongo
     command: ["--replSet", "rs", "--bind_ip_all", "--port", "27017"]
     healthcheck:
-      test: echo "try { rs.status() } catch (err) { rs.initiate({_id: 'rs', members: [{ _id: 0, host: 'mongo:27017' }]}) }" | mongosh --port 27017 --quiet
+      test: ["CMD-SHELL", "echo \"try { rs.status() } catch (err) { rs.initiate({_id: 'rs', members: [{ _id: 0, host: 'mongo:27017' }]}) }\" | mongosh --quiet --port 27017"]
       interval: 10s
       timeout: 30s
       start_period: 0s
