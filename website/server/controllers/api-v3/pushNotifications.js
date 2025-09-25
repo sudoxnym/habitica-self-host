@@ -3,6 +3,7 @@ import {
   NotFound,
 } from '../../libs/errors';
 import { model as PushDevice } from '../../models/pushDevice';
+import { sendNotification as sendPushNotification } from '../../libs/pushNotifications';
 
 const api = {};
 
@@ -54,6 +55,58 @@ api.addPushDevice = {
     user.pushDevices.push(pushDevice);
 
     res.respond(200, user.pushDevices, res.t('pushDeviceAdded'));
+  },
+};
+
+/**
+ * @apiIgnore
+ * @api {post} /api/v3/user/push-devices/test Send a test push notification
+ * @apiName UserSendTestPushNotification
+ * @apiGroup User
+ *
+ * @apiParam (Body) {String} [regId] The id of a specific push device to target
+ *
+ * @apiSuccess {String} message Success message
+ */
+api.sendUnifiedPushTest = {
+  method: 'POST',
+  url: '/user/push-devices/test',
+  middlewares: [authWithHeaders()],
+  async handler (req, res) {
+    const { user } = res.locals;
+
+    const regId = req.body?.regId;
+    const pushDevices = user.pushDevices?.toObject ? user.pushDevices.toObject() : user.pushDevices;
+    let unifiedPushDevices = (pushDevices || []).filter(device => device?.type === 'unifiedpush');
+
+    if (regId) {
+      unifiedPushDevices = unifiedPushDevices.filter(device => device.regId === regId);
+    }
+
+    if (unifiedPushDevices.length === 0) {
+      throw new NotFound(res.t('pushDeviceNotFound'));
+    }
+
+    const notificationTitle = req.body?.title
+      || res.t('unifiedPushTestTitle', { defaultValue: 'Habitica UnifiedPush Test' });
+    const notificationMessage = req.body?.message
+      || res.t('unifiedPushTestMessage', { defaultValue: 'This is a test UnifiedPush notification from Habitica.' });
+    const successMessage = res.t('unifiedPushTestSent', { defaultValue: 'UnifiedPush test notification sent.' });
+
+    const userForPush = user.toObject ? user.toObject() : { ...user };
+    userForPush._id = user._id;
+    userForPush.pushDevices = unifiedPushDevices;
+
+    await sendPushNotification(userForPush, {
+      identifier: 'unifiedPushTestNotification',
+      title: notificationTitle,
+      message: notificationMessage,
+      payload: {
+        message: notificationMessage,
+      },
+    });
+
+    res.respond(200, null, successMessage);
   },
 };
 

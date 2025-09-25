@@ -144,6 +144,7 @@ async function sendUnifiedPushNotification (user, pushDevice, details, payload) 
   const body = {
     title: details.title,
     message: details.message,
+    body: details.message,
     identifier: details.identifier,
     payload,
   };
