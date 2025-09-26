@@ -6,6 +6,8 @@ Adaptions and infrastructure to facilitate self-hosting of the habit-building pr
 
 For each release in the Habitica upstream repository, the self-hosting adaptions are automatically applied by rebasing the `self-host` branch onto the last release commit. The Docker images for server and client are built then and pushed to Docker Hub as [sudoxreboot/habitica-self-host](https://hub.docker.com/r/sudoxreboot/habitica-self-host) and [awinterstein/habitica-client](https://hub.docker.com/r/awinterstein/habitica-client).
 
+Looking for the matching UnifiedPush-enabled Android client? See [sudoxnym/habitica-android](https://github.com/sudoxnym/habitica-android).
+
 ## Improvements for Self-Hosting
 
 The following noteworthy changes were applied to the Habitica source code:
